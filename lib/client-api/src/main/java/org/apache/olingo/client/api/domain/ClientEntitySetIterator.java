@@ -170,7 +170,7 @@ public class ClientEntitySetIterator<T extends ClientEntitySet, E extends Client
   }
 
   private ResWrap<Entity> nextJSONEntityFromEntitySet(final InputStream input, final OutputStream osEntitySet) {
-    final ByteArrayOutputStream entity = new ByteArrayOutputStream();
+	    final ByteArrayOutputStream entity = new ByteArrayOutputStream();
 
     ResWrap<Entity> jsonEntity = null;
     try {
@@ -192,17 +192,34 @@ public class ClientEntitySetIterator<T extends ClientEntitySet, E extends Client
       } while (c >= 0);
 
       if (foundNewOne) {
-        int count = 1;
+        int objectCount = 1;
+        int stringCount = 0;
         c = 0;
+	        
+        boolean previousCharIsEscape = false;
 
-        while (count > 0 && c >= 0) {
+        while (objectCount > 0 && c >= 0) {
           c = input.read();
-          if (c == '{') {
-            count++;
-          } else if (c == '}') {
-            count--;
+          // Ignore { and } when part of a JSON String
+          if (c == '{' && stringCount <= 0) {
+            objectCount++;
+          } else if (c == '}' && stringCount <= 0) {
+            objectCount--;
+            // Detect JSON Strings to be able to correctly detect an Entity
+          } else if (c == '"' && stringCount <= 0  && !previousCharIsEscape) {
+            stringCount++;
+          } else if (c == '"' && stringCount > 0  && !previousCharIsEscape) {
+            stringCount--;
           }
+
           entity.write(c);
+	          
+          if (c == '\\' && !previousCharIsEscape) {
+            previousCharIsEscape = true;
+          } else {
+            previousCharIsEscape = false;
+          }
+
         }
 
         if (c >= 0) {
@@ -220,7 +237,7 @@ public class ClientEntitySetIterator<T extends ClientEntitySet, E extends Client
 
     return jsonEntity;
   }
-
+  
   private ResWrap<Entity> nextAtomEntityFromEntitySet(
           final InputStream input, final OutputStream osEntitySet, final String namespaces) {
 
